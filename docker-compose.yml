@@ -1,0 +1,162 @@
+version: '3.9'
+
+services:
+  # =====================
+  # Infrastructure
+  # =====================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-userdb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-userdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ms-network
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: ms-nats
+    restart: unless-stopped
+    command: >
+      -js
+      -sd /data
+      -p 4222
+      -m 8222
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "-O", "-", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - ms-network
+
+  # =====================
+  # Database Migration
+  # =====================
+  db-migrate:
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+      target: migrator
+    container_name: ms-db-migrate
+    command: ["npx", "prisma", "migrate", "deploy", "--schema=/app/prisma/schema.prisma"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/userdb?schema=public}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ms-network
+    restart: "no"
+
+  # =====================
+  # Application Services
+  # =====================
+  user-service:
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+    container_name: ms-user-service
+    restart: unless-stopped
+    environment:
+      USER_SERVICE_PORT: ${USER_SERVICE_PORT:-3001}
+      USER_SERVICE_HOST: ${USER_SERVICE_HOST:-0.0.0.0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/userdb?schema=public}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      NATS_STREAM_NAME: ${NATS_STREAM_NAME:-USER_EVENTS}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "-O", "-", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ms-network
+    expose:
+      - "3001"
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: apps/notification-service/Dockerfile
+    container_name: ms-notification-service
+    restart: unless-stopped
+    environment:
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      NATS_STREAM_NAME: ${NATS_STREAM_NAME:-USER_EVENTS}
+      NATS_CONSUMER_NAME: ${NATS_CONSUMER_NAME:-notification-service-consumer}
+      NATS_MAX_DELIVER: ${NATS_MAX_DELIVER:-5}
+      NATS_ACK_WAIT_SECONDS: ${NATS_ACK_WAIT_SECONDS:-30}
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      nats:
+        condition: service_healthy
+    networks:
+      - ms-network
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    container_name: ms-gateway
+    restart: unless-stopped
+    environment:
+      GATEWAY_PORT: ${GATEWAY_PORT:-3000}
+      GATEWAY_HOST: ${GATEWAY_HOST:-0.0.0.0}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:3001}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      RATE_LIMIT_TIME_WINDOW: ${RATE_LIMIT_TIME_WINDOW:-60000}
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${GATEWAY_PORT:-3000}:${GATEWAY_PORT:-3000}"
+    depends_on:
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "-O", "-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ms-network
+
+volumes:
+  postgres_data:
+  nats_data:
+
+networks:
+  ms-network:
+    driver: bridge

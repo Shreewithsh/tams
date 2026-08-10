@@ -1,0 +1,37 @@
+{
+  "name": "@ms/user-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ms/contracts": "workspace:*",
+    "@ms/shared": "workspace:*",
+    "@ms/config": "workspace:*",
+    "@prisma/client": "^5.16.0",
+    "@fastify/helmet": "^11.0.0",
+    "@fastify/cors": "^9.0.0",
+    "argon2": "^0.31.0",
+    "fastify": "^4.28.0",
+    "nats": "^2.28.0",
+    "pino": "^9.0.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "prisma": "^5.16.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

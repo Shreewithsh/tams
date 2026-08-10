@@ -1,0 +1,247 @@
+openapi: '3.0.3'
+info:
+  title: Microservices API
+  version: '1.0.0'
+  description: |
+    API Gateway for the microservices monorepo.
+    The Gateway is the only publicly exposed HTTP endpoint.
+    All inter-service communication is via NATS JetStream.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserProfile:
+      type: object
+      required: [id, name, email, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: '550e8400-e29b-41d4-a716-446655440000'
+        name:
+          type: string
+          example: 'Alice Smith'
+        email:
+          type: string
+          format: email
+          example: 'alice@example.com'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: 'Alice Smith'
+        email:
+          type: string
+          format: email
+          example: 'alice@example.com'
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          example: 'securepassword123'
+
+    RegisterResponse:
+      type: object
+      required: [user, accessToken]
+      properties:
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        accessToken:
+          type: string
+          description: HS256 JWT. Include in subsequent requests as Bearer token.
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok, ready, not ready]
+          example: 'ok'
+        service:
+          type: string
+          example: 'api-gateway'
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required: [statusCode, error, code, message]
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: 'Bad Request'
+        code:
+          type: string
+          example: 'VALIDATION_ERROR'
+        message:
+          type: string
+          example: 'Request validation failed'
+        requestId:
+          type: string
+          format: uuid
+        details:
+          type: array
+          items:
+            type: object
+
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Register a new user account
+      description: |
+        Creates a new user account and returns an access token.
+        The password is hashed with Argon2id before storage.
+        After registration, a `user.created` event is published to NATS JetStream.
+        The Notification Service independently consumes this event and sends a welcome notification.
+      operationId: registerUser
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 400
+                error: 'Bad Request'
+                code: 'VALIDATION_ERROR'
+                message: 'Request validation failed'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 409
+                error: 'ConflictError'
+                code: 'CONFLICT'
+                message: "A user with email 'alice@example.com' already exists"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: User Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/users/me:
+    get:
+      summary: Get the authenticated user's profile
+      description: |
+        Returns the profile of the currently authenticated user.
+        
+        Authentication flow:
+        1. Client sends a valid JWT in the Authorization header.
+        2. Gateway verifies the JWT signature and expiry.
+        3. Gateway extracts the userId from the JWT `sub` claim.
+        4. Gateway forwards userId to User Service via X-User-Id header (internal).
+        5. User Service fetches and returns the profile.
+        
+        The client-provided userId is NEVER trusted — only the Gateway-derived value is used.
+      operationId: getMyProfile
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                error: 'UnauthorizedError'
+                code: 'UNAUTHORIZED'
+                message: 'Missing or malformed Authorization header'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: User Service unavailable
+
+  /health:
+    get:
+      summary: Gateway health check
+      description: Returns 200 if the Gateway process is alive.
+      operationId: healthCheck
+      tags: [Observability]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /ready:
+    get:
+      summary: Gateway readiness check
+      description: Returns 200 if the Gateway is ready to serve traffic.
+      operationId: readinessCheck
+      tags: [Observability]
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'

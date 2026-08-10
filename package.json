@@ -1,0 +1,25 @@
+{
+  "name": "microservices-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:coverage": "pnpm -r test:coverage",
+    "lint": "pnpm -r lint",
+    "dev": "pnpm -r --parallel dev",
+    "db:generate": "prisma generate --schema=./prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=./prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
+    "db:studio": "prisma studio --schema=./prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "prisma": "^5.16.0"
+  }
+}
