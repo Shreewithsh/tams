@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import * as argon2 from 'argon2';
+import bcrypt from 'bcryptjs';
 import { createLogger } from '@ms/shared';
 import { createUserCreatedEvent } from '@ms/contracts';
 import type { IUserRepository } from '../../infrastructure/repositories/user-repository.js';
@@ -16,7 +16,7 @@ const logger = createLogger({ name: 'register-user' });
  *
  * Flow:
  * 1. Check for duplicate email.
- * 2. Hash the password with Argon2id — plaintext never leaves this method.
+ * 2. Hash the password with bcrypt (10 rounds) — plaintext never leaves this method.
  * 3. Persist the user.
  * 4. Publish `user.created` to NATS JetStream ONLY after the DB commit succeeds.
  * 5. Generate and return a JWT.
@@ -37,13 +37,8 @@ export class RegisterUserUseCase {
       throw new UserAlreadyExistsError(input.email);
     }
 
-    // 2. Hash the password — never store or transmit the plaintext
-    const passwordHash = await argon2.hash(input.password, {
-      type: argon2.argon2id,
-      memoryCost: 65536, // 64 MiB
-      timeCost: 3,
-      parallelism: 4,
-    });
+    // 2. Hash the password securely with bcrypt — never store or transmit plaintext
+    const passwordHash = await bcrypt.hash(input.password, 10);
 
     // 3. Persist the user
     const userId = randomUUID();

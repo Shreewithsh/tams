@@ -3,7 +3,7 @@
 # ============================================================
 FROM node:22-alpine AS builder
 
-RUN apk add --no-cache openssl libc6-compat python3 make g++
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
@@ -15,7 +15,6 @@ COPY packages ./packages
 COPY apps/user-service ./apps/user-service
 
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
-RUN pnpm rebuild argon2
 
 RUN pnpm --filter @ms/contracts build
 RUN pnpm --filter @ms/shared build

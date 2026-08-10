@@ -4,7 +4,7 @@ import { UserAlreadyExistsError } from '../../domain/errors.js';
 import type { IUserRepository } from '../../infrastructure/repositories/user-repository.js';
 import type { IEventPublisher } from '../../infrastructure/messaging/event-publisher.js';
 import type { User } from '../../domain/user.js';
-import * as argon2 from 'argon2';
+import bcrypt from 'bcryptjs';
 
 const JWT_SECRET = 'test-jwt-secret-that-is-at-least-32-characters-long';
 
@@ -54,7 +54,7 @@ describe('RegisterUserUseCase', () => {
     expect(result.accessToken.split('.')).toHaveLength(3); // valid JWT
   });
 
-  it('should hash the password with argon2id (never store plaintext)', async () => {
+  it('should hash the password with bcrypt (never store plaintext)', async () => {
     const password = 'securepassword123';
     await useCase.execute({ name: 'Alice', email: 'alice@example.com', password });
 
@@ -63,8 +63,8 @@ describe('RegisterUserUseCase', () => {
     const createArg = createCall![0];
     expect(createArg.passwordHash).not.toBe(password);
 
-    // Verify the hash is a valid argon2 hash
-    const isValid = await argon2.verify(createArg.passwordHash, password);
+    // Verify the hash is a valid bcrypt hash
+    const isValid = await bcrypt.compare(password, createArg.passwordHash);
     expect(isValid).toBe(true);
   });
 
