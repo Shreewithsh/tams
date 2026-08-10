@@ -7,24 +7,12 @@ export interface LoggerOptions {
 
 /**
  * Creates a structured pino logger instance.
- * Outputs JSON in production and pretty-prints in development.
+ * Outputs clean JSON logs.
  */
 export function createLogger(options: LoggerOptions): pino.Logger {
-  const isDev = process.env['NODE_ENV'] !== 'production';
-
   return pino({
     name: options.name,
     level: options.level ?? process.env['LOG_LEVEL'] ?? 'info',
-    ...(isDev && {
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-        },
-      },
-    }),
     redact: {
       paths: ['password', 'passwordHash', 'token', 'authorization', '*.password', '*.token'],
       censor: '[REDACTED]',
