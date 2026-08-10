@@ -7,20 +7,11 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml* ./
-
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/config/package.json ./packages/config/
-COPY apps/gateway/package.json ./apps/gateway/
+COPY pnpm-workspace.yaml package.json tsconfig.json ./
+COPY packages ./packages
+COPY apps/gateway ./apps/gateway
 
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
-
-COPY packages/shared ./packages/shared
-COPY packages/config ./packages/config
-COPY apps/gateway ./apps/gateway
-COPY tsconfig.json ./
 
 RUN pnpm --filter @ms/shared build
 RUN pnpm --filter @ms/config build
@@ -37,12 +28,7 @@ ENV NODE_ENV=production
 
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
-COPY --from=builder --chown=nodejs:nodejs /app/apps/gateway/dist ./apps/gateway/dist
-COPY --from=builder --chown=nodejs:nodejs /app/apps/gateway/package.json ./apps/gateway/package.json
-COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
-COPY --from=builder --chown=nodejs:nodejs /app/pnpm-workspace.yaml ./
+COPY --from=builder --chown=nodejs:nodejs /app ./
 
 USER nodejs
 

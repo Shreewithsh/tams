@@ -9,23 +9,12 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml* ./
-
-COPY packages/contracts/package.json ./packages/contracts/
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/config/package.json ./packages/config/
-COPY apps/user-service/package.json ./apps/user-service/
+COPY pnpm-workspace.yaml package.json tsconfig.json ./
+COPY prisma ./prisma
+COPY packages ./packages
+COPY apps/user-service ./apps/user-service
 
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
-
-COPY packages/contracts ./packages/contracts
-COPY packages/shared ./packages/shared
-COPY packages/config ./packages/config
-COPY apps/user-service ./apps/user-service
-COPY prisma ./prisma
-COPY tsconfig.json ./
 
 RUN pnpm --filter @ms/contracts build
 RUN pnpm --filter @ms/shared build
@@ -44,9 +33,7 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY package.json pnpm-workspace.yaml ./
+COPY --from=builder /app ./
 
 # ============================================================
 # Stage 3: Production runner
@@ -61,13 +48,7 @@ ENV NODE_ENV=production
 
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
-COPY --from=builder --chown=nodejs:nodejs /app/apps/user-service/dist ./apps/user-service/dist
-COPY --from=builder --chown=nodejs:nodejs /app/apps/user-service/package.json ./apps/user-service/package.json
-COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
-COPY --from=builder --chown=nodejs:nodejs /app/pnpm-workspace.yaml ./
+COPY --from=builder --chown=nodejs:nodejs /app ./
 
 USER nodejs
 
