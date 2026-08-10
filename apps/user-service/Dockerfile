@@ -62,12 +62,7 @@ ENV NODE_ENV=production
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/packages/contracts/dist ./packages/contracts/dist
-COPY --from=builder --chown=nodejs:nodejs /app/packages/contracts/package.json ./packages/contracts/package.json
-COPY --from=builder --chown=nodejs:nodejs /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder --chown=nodejs:nodejs /app/packages/shared/package.json ./packages/shared/package.json
-COPY --from=builder --chown=nodejs:nodejs /app/packages/config/dist ./packages/config/dist
-COPY --from=builder --chown=nodejs:nodejs /app/packages/config/package.json ./packages/config/package.json
+COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
 COPY --from=builder --chown=nodejs:nodejs /app/apps/user-service/dist ./apps/user-service/dist
 COPY --from=builder --chown=nodejs:nodejs /app/apps/user-service/package.json ./apps/user-service/package.json
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
