@@ -93,7 +93,7 @@ services:
       db-migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "-q", "--tries=1", "-O", "-", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-q", "--tries=1", "-O", "-", "http://127.0.0.1:3001/health"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -145,7 +145,7 @@ services:
       user-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--tries=1", "-O", "-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-q", "--tries=1", "-O", "-", "http://127.0.0.1:3000/health"]
       interval: 15s
       timeout: 5s
       retries: 5
