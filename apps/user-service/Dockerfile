@@ -55,6 +55,6 @@ USER nodejs
 EXPOSE 3001
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -q --tries=1 -O - http://localhost:3001/health || exit 1
+  CMD wget -q --tries=1 -O - http://127.0.0.1:3001/health || exit 1
 
 CMD ["node", "apps/user-service/dist/index.js"]
