@@ -16,7 +16,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/config/package.json ./packages/config/
 COPY apps/user-service/package.json ./apps/user-service/
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 COPY packages/contracts ./packages/contracts
 COPY packages/shared ./packages/shared
