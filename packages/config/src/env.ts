@@ -5,7 +5,7 @@ import { z, ZodSchema } from 'zod';
  * Exits the process immediately on validation failure,
  * since missing/invalid env vars make the service non-functional.
  */
-export function validateEnv<T>(schema: ZodSchema<T>): T {
+export function validateEnv<T>(schema: z.ZodType<T, any, any>): T {
   const result = schema.safeParse(process.env);
 
   if (!result.success) {

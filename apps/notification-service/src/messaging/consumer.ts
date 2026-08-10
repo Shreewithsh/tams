@@ -1,5 +1,8 @@
 import {
   connect,
+  StorageType,
+  RetentionPolicy,
+  AckPolicy,
   type NatsConnection,
   type JetStreamManager,
   type ConsumerMessages,
@@ -12,37 +15,6 @@ import type { NotificationEnv } from '../config/env.js';
 
 const logger = createLogger({ name: 'nats-consumer' });
 
-/**
- * NATS JetStream Consumer for the Notification Service.
- *
- * RELIABILITY DESIGN:
- * ─────────────────────────────────────────────────────────────
- * Stream:        USER_EVENTS
- * Subject:       users.created
- * Consumer:      notification-service-consumer (durable)
- * Delivery:      explicit ack required
- * maxDeliver:    5 (configurable via env)
- * ackWait:       30s (configurable via env)
- * Storage:       file (survives NATS restarts)
- * DLQ subject:   notifications.dlq
- *
- * HOW RETRY / DLQ WORKS:
- * 1. A message arrives from USER_EVENTS/users.created.
- * 2. The handler attempts to process it (validate + send notification).
- * 3. On SUCCESS → msg.ack() is called. Message is done.
- * 4. On FAILURE → msg.nak() is called. JetStream schedules redelivery
- *    after ackWait seconds, incrementing the delivery counter.
- * 5. After maxDeliver (5) failed attempts, JetStream publishes the
- *    original message to `notifications.dlq` and stops redelivering.
- * 6. A separate DLQ consumer (or operator tool) can then inspect,
- *    alert on, or replay DLQ messages.
- *
- * This prevents:
- *   - Infinite retry loops (maxDeliver cap)
- *   - Message loss (durable consumer + file storage)
- *   - Silent failures (DLQ + logging)
- * ─────────────────────────────────────────────────────────────
- */
 export class NotificationConsumer {
   private nc!: NatsConnection;
   private messages!: ConsumerMessages;
@@ -102,8 +74,8 @@ export class NotificationConsumer {
       await jsm.streams.add({
         name: this.cfg.NATS_STREAM_NAME,
         subjects: [SUBJECTS.USER_CREATED],
-        storage: 'file',
-        retention: 'limits',
+        storage: StorageType.File,
+        retention: RetentionPolicy.Limits,
         max_age: 7 * 24 * 60 * 60 * 1_000_000_000,
         num_replicas: 1,
       });
@@ -117,17 +89,13 @@ export class NotificationConsumer {
     } catch {
       await jsm.consumers.add(this.cfg.NATS_STREAM_NAME, {
         durable_name: this.cfg.NATS_CONSUMER_NAME,
-        ack_policy: 'explicit',
+        ack_policy: AckPolicy.Explicit,
         ack_wait: this.cfg.NATS_ACK_WAIT_SECONDS * 1_000_000_000, // nanoseconds
         max_deliver: this.cfg.NATS_MAX_DELIVER,
         filter_subject: SUBJECTS.USER_CREATED,
-        // Dead-letter subject: after maxDeliver failures, publish here
-        // Note: NATS calls this the "dead letter" via advisory — the
-        // messages that exceed maxDeliver are moved to the DLQ subject.
-        deliver_subject: undefined, // pull consumer
+        deliver_subject: undefined,
       });
 
-      // Create a separate stream to hold DLQ messages
       await this.ensureDlqStream(jsm);
 
       logger.info(
@@ -149,8 +117,8 @@ export class NotificationConsumer {
       await jsm.streams.add({
         name: 'NOTIFICATIONS_DLQ',
         subjects: [SUBJECTS.NOTIFICATIONS_DLQ],
-        storage: 'file',
-        retention: 'limits',
+        storage: StorageType.File,
+        retention: RetentionPolicy.Limits,
         max_age: 30 * 24 * 60 * 60 * 1_000_000_000, // 30 days
         num_replicas: 1,
       });
@@ -159,5 +127,4 @@ export class NotificationConsumer {
   }
 }
 
-// Export consumer name constant for use in tests
 export { CONSUMERS };
