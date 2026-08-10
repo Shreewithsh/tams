@@ -28,9 +28,8 @@ COPY tsconfig.json ./
 RUN pnpm --filter @ms/contracts build
 RUN pnpm --filter @ms/shared build
 RUN pnpm --filter @ms/config build
-RUN pnpm --filter @ms/user-service build
-
 RUN pnpm exec prisma generate --schema=/app/prisma/schema.prisma
+RUN pnpm --filter @ms/user-service build
 
 # ============================================================
 # Stage 2: Migrator (used by db-migrate service in compose)

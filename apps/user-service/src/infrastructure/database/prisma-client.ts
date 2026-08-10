@@ -22,23 +22,6 @@ export const prisma = new PrismaClient({
         ],
 });
 
-if (env.NODE_ENV === 'development') {
-  // @ts-expect-error — Prisma event types are correctly typed at runtime
-  prisma.$on('query', (e: { query: string; duration: number }) => {
-    logger.debug({ query: e.query, duration: e.duration }, 'Prisma query');
-  });
-}
-
-// @ts-expect-error — Prisma event types are correctly typed at runtime
-prisma.$on('warn', (e: { message: string }) => {
-  logger.warn({ message: e.message }, 'Prisma warning');
-});
-
-// @ts-expect-error — Prisma event types are correctly typed at runtime
-prisma.$on('error', (e: { message: string }) => {
-  logger.error({ message: e.message }, 'Prisma error');
-});
-
 export async function connectDatabase(): Promise<void> {
   await prisma.$connect();
   logger.info('Database connection established');
