@@ -39,7 +39,7 @@ export async function buildServer() {
       statusCode: 429,
       error: 'Too Many Requests',
       code: 'RATE_LIMIT_EXCEEDED',
-      message: `Rate limit exceeded. Try again in ${Math.ceil(context.after / 1000)}s.`,
+      message: `Rate limit exceeded. Try again in ${Math.ceil((Number(context.after) || 0) / 1000)}s.`,
     }),
   });
 
